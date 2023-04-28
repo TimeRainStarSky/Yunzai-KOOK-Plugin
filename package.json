@@ -1,0 +1,8 @@
+{
+  "name": "KOOK-Plugin",
+  "type": "module",
+  "author": "TimeRainStarSky",
+  "dependencies": {
+    "kasumi.js": "^0.3.0"
+  }
+}
