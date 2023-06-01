@@ -1,6 +1,7 @@
 logger.info(logger.yellow("- 正在加载 KOOK 插件"))
 
 import { config, configSave } from "./Model/config.js"
+import fetch from "node-fetch"
 import { Kasumi } from "kasumi.js"
 
 const adapter = new class KOOKAdapter {
@@ -83,10 +84,10 @@ const adapter = new class KOOKAdapter {
     return msgs
   }
 
-  async makeForwardMsg(data, send, msg) {
+  async makeForwardMsg(send, msg) {
     const messages = []
     for (const i of msg)
-      messages.push(await send(data, i.message))
+      messages.push(await send(i.message))
     messages.data = "消息"
     return messages
   }
@@ -179,7 +180,7 @@ const adapter = new class KOOKAdapter {
       token
     })
     bot.connect()
-    await new Promise(resolve => bot.once("connect.*", () => resolve()))
+    await new Promise(resolve => bot.once("connect.*", resolve))
 
     if (!bot.me?.userId) {
       logger.error(`${logger.blue(`[${token}]`)} KOOKBot 连接失败`)
@@ -206,7 +207,7 @@ const adapter = new class KOOKAdapter {
       return {
         sendMsg: msg => this.sendFriendMsg(i, msg),
         recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.directMessage.delete(message_id), message_id),
-        makeForwardMsg: msg => this.makeForwardMsg(i, this.sendFriendMsg, msg),
+        makeForwardMsg: msg => this.makeForwardMsg(msg => this.sendFriendMsg(i, msg), msg),
       }
     }
     Bot[id].pickUser = Bot[id].pickFriend
@@ -223,7 +224,7 @@ const adapter = new class KOOKAdapter {
       return {
         sendMsg: msg => this.sendGroupMsg(i, msg),
         recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.message.delete(message_id), message_id),
-        makeForwardMsg: msg => this.makeForwardMsg(i, this.sendGroupMsg, msg),
+        makeForwardMsg: msg => this.makeForwardMsg(msg => this.sendGroupMsg(i, msg), msg),
         pickMember: user_id => i.bot.pickMember(i.group_id, user_id),
       }
     }
@@ -261,12 +262,12 @@ export class KOOK extends plugin {
       event: "message",
       rule: [
         {
-          reg: "^#[Kk][Oo]账号$",
+          reg: "^#[Kk][Oo]+[Kk]?账号$",
           fnc: "List",
           permission: "master"
         },
         {
-          reg: "^#[Kk][Oo]设置.*$",
+          reg: "^#[Kk][Oo]+[Kk]?设置.*$",
           fnc: "Token",
           permission: "master"
         }
@@ -279,7 +280,7 @@ export class KOOK extends plugin {
   }
 
   async Token () {
-    const token = this.e.msg.replace(/^#[Kk][Oo]设置/, "").trim()
+    const token = this.e.msg.replace(/^#[Kk][Oo]+[Kk]?设置/, "").trim()
     if (config.token.includes(token)) {
       config.token = config.token.filter(item => item != token)
       await this.reply(`账号已删除，重启后生效，共${config.token.length}个账号`, true)
