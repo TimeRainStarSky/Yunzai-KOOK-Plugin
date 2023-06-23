@@ -50,6 +50,12 @@ const adapter = new class KOOKAdapter {
         case "at":
           at = i.data.qq.replace(/^ko_/, "")
           break
+        case "node":
+          for (const ret of (await this.sendForwardMsg(msg => this.sendMsg(data, send, msg), i.data))) {
+            msgs.push(...ret.data)
+            message_id.push(...ret.message_id)
+          }
+          break
         default:
           i = JSON.stringify(i)
           logger.info(`${logger.blue(`[${data.self_id}]`)} 发送消息：${i}`)
@@ -57,7 +63,7 @@ const adapter = new class KOOKAdapter {
       }
       if (ret) {
         msgs.push(ret)
-        if (ret.data?.msg_id)
+        if (ret?.data?.msg_id)
           message_id.push(ret.data.msg_id)
       }
     }
@@ -80,16 +86,43 @@ const adapter = new class KOOKAdapter {
       message_id = [message_id]
     const msgs = []
     for (const i of message_id)
-      msgs.push(await recall(message_id))
+      msgs.push(await recall(i))
     return msgs
   }
 
-  async makeForwardMsg(send, msg) {
+  async sendForwardMsg(send, msg) {
     const messages = []
     for (const i of msg)
       messages.push(await send(i.message))
-    messages.data = "消息"
     return messages
+  }
+
+  pickFriend(id, user_id) {
+    const i = { self_id: id, bot: Bot[id], user_id: user_id.replace(/^ko_/, "") }
+    return {
+      sendMsg: msg => this.sendFriendMsg(i, msg),
+      recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.directMessage.delete(message_id), message_id),
+      makeForwardMsg: Bot.makeForwardMsg,
+      sendForwardMsg: msg => this.sendForwardMsg(msg => this.sendFriendMsg(i, msg), msg),
+    }
+  }
+
+  pickMember(id, group_id, user_id) {
+    const i = { self_id: id, bot: Bot[id], group_id: group_id.replace(/^ko_/, ""), user_id: user_id.replace(/^ko_/, "") }
+    return {
+      ...this.pickFriend(id, user_id),
+    }
+  }
+
+  pickGroup(id, group_id) {
+    const i = { self_id: id, bot: Bot[id], group_id: group_id.replace(/^ko_/, "") }
+    return {
+      sendMsg: msg => this.sendGroupMsg(i, msg),
+      recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.message.delete(message_id), message_id),
+      makeForwardMsg: Bot.makeForwardMsg,
+      sendForwardMsg: msg => this.sendForwardMsg(msg => this.sendGroupMsg(i, msg), msg),
+      pickMember: user_id => this.pickMember(id, i.group_id, user_id),
+    }
   }
 
   makeMessage(data) {
@@ -107,7 +140,7 @@ const adapter = new class KOOKAdapter {
     }
 
     if (data.isMentionHere) {
-      data.message.push({ type: "at", qq: "all" })
+      data.message.push({ type: "at", qq: "online" })
       data.raw_message += `[提及在线成员]`
     }
 
@@ -202,32 +235,11 @@ const adapter = new class KOOKAdapter {
     Bot[id].fl = new Map()
     Bot[id].gl = new Map()
 
-    Bot[id].pickFriend = user_id => {
-      const i = { self_id: id, bot: Bot[id], user_id: user_id.replace(/^ko_/, "") }
-      return {
-        sendMsg: msg => this.sendFriendMsg(i, msg),
-        recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.directMessage.delete(message_id), message_id),
-        makeForwardMsg: msg => this.makeForwardMsg(msg => this.sendFriendMsg(i, msg), msg),
-      }
-    }
+    Bot[id].pickFriend = user_id => this.pickFriend(id, user_id)
     Bot[id].pickUser = Bot[id].pickFriend
 
-    Bot[id].pickMember = (group_id, user_id) => {
-      const i = { self_id: id, bot: Bot[id], group_id: group_id.replace(/^ko_/, ""), user_id: user_id.replace(/^ko_/, "") }
-      return {
-        ...Bot[id].pickFriend(user_id),
-      }
-    }
-
-    Bot[id].pickGroup = group_id => {
-      const i = { self_id: id, bot: Bot[id], group_id: group_id.replace(/^ko_/, "") }
-      return {
-        sendMsg: msg => this.sendGroupMsg(i, msg),
-        recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.message.delete(message_id), message_id),
-        makeForwardMsg: msg => this.makeForwardMsg(msg => this.sendGroupMsg(i, msg), msg),
-        pickMember: user_id => i.bot.pickMember(i.group_id, user_id),
-      }
-    }
+    Bot[id].pickMember = (group_id, user_id) => this.pickMember(id, group_id, user_id)
+    Bot[id].pickGroup = group_id => this.pickGroup(id, group_id)
 
     if (Array.isArray(Bot.uin)) {
       if (!Bot.uin.includes(id))
