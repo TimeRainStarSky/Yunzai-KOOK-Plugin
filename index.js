@@ -97,6 +97,33 @@ const adapter = new class KOOKAdapter {
     return messages
   }
 
+  async getGroupArray(id) {
+    const array = []
+    for await (const i of Bot[id].API.guild.list()) for (const guild of i.data.items)
+      for await (const i of Bot[id].API.channel.list(guild.id)) for (const channel of i.data.items)
+        array.push({
+          ...guild,
+          ...channel,
+          group_id: `ko_${channel.id}`,
+          group_name: `${guild.name}-${channel.name}`,
+        })
+    return array
+  }
+
+  async getGroupList(id) {
+    const array = []
+    for (const i of (await this.getGroupArray(id)))
+      array.push(i.group_id)
+    return array
+  }
+
+  async getGroupMap(id) {
+    const map = new Map()
+    for (const i of (await this.getGroupArray(id)))
+      map.set(i.group_id, i)
+    return map
+  }
+
   pickFriend(id, user_id) {
     const i = { self_id: id, bot: Bot[id], user_id: user_id.replace(/^ko_/, "") }
     return {
@@ -126,9 +153,10 @@ const adapter = new class KOOKAdapter {
   }
 
   makeMessage(data) {
+    data.post_type = "message"
     data.user_id = `ko_${data.authorId}`
     data.sender = data.author
-    data.post_type = "message"
+    data.bot.fl.set(data.user_id, data.sender)
     data.message_id = data.messageId
 
     data.message = []
@@ -232,14 +260,19 @@ const adapter = new class KOOKAdapter {
       onebot_version: "v11",
     }
     Bot[id].stat = { start_time: Date.now()/1000 }
-    Bot[id].fl = new Map()
-    Bot[id].gl = new Map()
 
     Bot[id].pickFriend = user_id => this.pickFriend(id, user_id)
     Bot[id].pickUser = Bot[id].pickFriend
 
     Bot[id].pickMember = (group_id, user_id) => this.pickMember(id, group_id, user_id)
     Bot[id].pickGroup = group_id => this.pickGroup(id, group_id)
+
+    Bot[id].getGroupArray = () => this.getGroupArray(id)
+    Bot[id].getGroupList = () => this.getGroupList(id)
+    Bot[id].getGroupMap = () => this.getGroupMap(id)
+
+    Bot[id].fl = new Map()
+    Bot[id].gl = await Bot[id].getGroupMap()
 
     if (Array.isArray(Bot.uin)) {
       if (!Bot.uin.includes(id))
