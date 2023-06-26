@@ -5,6 +5,11 @@ import fetch from "node-fetch"
 import { Kasumi } from "kasumi.js"
 
 const adapter = new class KOOKAdapter {
+  constructor() {
+    this.id = "KOOK"
+    this.name = "KOOKBot"
+  }
+
   async uploadFile(data, file) {
     if (file.match(/^base64:\/\//))
       return (await data.bot.API.asset.create(Buffer.from(file.replace(/^base64:\/\//, ""), "base64"))).data.url
@@ -125,8 +130,14 @@ const adapter = new class KOOKAdapter {
   }
 
   pickFriend(id, user_id) {
-    const i = { self_id: id, bot: Bot[id], user_id: user_id.replace(/^ko_/, "") }
+    const i = {
+      ...Bot[id].fl.get(user_id),
+      self_id: id,
+      bot: Bot[id],
+      user_id: user_id.replace(/^ko_/, ""),
+    }
     return {
+      ...i,
       sendMsg: msg => this.sendFriendMsg(i, msg),
       recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.directMessage.delete(message_id), message_id),
       makeForwardMsg: Bot.makeForwardMsg,
@@ -135,15 +146,28 @@ const adapter = new class KOOKAdapter {
   }
 
   pickMember(id, group_id, user_id) {
-    const i = { self_id: id, bot: Bot[id], group_id: group_id.replace(/^ko_/, ""), user_id: user_id.replace(/^ko_/, "") }
+    const i = {
+      ...Bot[id].fl.get(user_id),
+      self_id: id,
+      bot: Bot[id],
+      group_id: group_id.replace(/^ko_/, ""),
+      user_id: user_id.replace(/^ko_/, ""),
+    }
     return {
       ...this.pickFriend(id, user_id),
+      ...i,
     }
   }
 
   pickGroup(id, group_id) {
-    const i = { self_id: id, bot: Bot[id], group_id: group_id.replace(/^ko_/, "") }
+    const i = {
+      ...Bot[id].gl.get(group_id),
+      self_id: id,
+      bot: Bot[id],
+      group_id: group_id.replace(/^ko_/, ""),
+    }
     return {
+      ...i,
       sendMsg: msg => this.sendGroupMsg(i, msg),
       recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.message.delete(message_id), message_id),
       makeForwardMsg: Bot.makeForwardMsg,
@@ -244,7 +268,7 @@ const adapter = new class KOOKAdapter {
     await new Promise(resolve => bot.once("connect.*", resolve))
 
     if (!bot.me?.userId) {
-      logger.error(`${logger.blue(`[${token}]`)} KOOKBot 连接失败`)
+      logger.error(`${logger.blue(`[${token}]`)} ${this.name}(${this.id}) 连接失败`)
       return false
     }
 
@@ -255,9 +279,9 @@ const adapter = new class KOOKAdapter {
     Bot[id].nickname = Bot[id].info.username
     Bot[id].avatar = Bot[id].info.avatar
     Bot[id].version = {
-      impl: "KOOKBot",
+      id: this.id,
+      name: this.name,
       version: config.package.dependencies["kasumi.js"],
-      onebot_version: "v11",
     }
     Bot[id].stat = { start_time: Date.now()/1000 }
 
@@ -274,12 +298,8 @@ const adapter = new class KOOKAdapter {
     Bot[id].fl = new Map()
     Bot[id].gl = await Bot[id].getGroupMap()
 
-    if (Array.isArray(Bot.uin)) {
-      if (!Bot.uin.includes(id))
-        Bot.uin.push(id)
-    } else {
-      Bot.uin = [id]
-    }
+    if (!Bot.uin.includes(id))
+      Bot.uin.push(id)
 
     Bot[id].on("message.*", data => {
       data.self_id = id
@@ -287,20 +307,23 @@ const adapter = new class KOOKAdapter {
       this.makeMessage(data)
     })
 
-    logger.mark(`${logger.blue(`[${id}]`)} KOOKBot 已连接`)
+    logger.mark(`${logger.blue(`[${id}]`)} ${this.name}(${this.id}) 已连接`)
     Bot.emit(`connect.${id}`, Bot[id])
     Bot.emit(`connect`, Bot[id])
     return true
   }
+
+  async load() {
+    for (const token of config.token)
+      await adapter.connect(token)
+    return true
+  }
 }
 
-Bot.once("online", async () => {
-  for (const token of config.token)
-    await adapter.connect(token)
-})
+Bot.adapter.push(adapter)
 
 export class KOOK extends plugin {
-  constructor () {
+  constructor() {
     super({
       name: "KOOK账号设置",
       dsc: "KOOK账号设置",
