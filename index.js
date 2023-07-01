@@ -104,7 +104,7 @@ const adapter = new class KOOKAdapter {
 
   async getGroupArray(id) {
     const array = []
-    for await (const i of Bot[id].API.guild.list()) for (const guild of i.data.items)
+    for await (const i of Bot[id].API.guild.list()) for (const guild of i.data.items) try {
       for await (const i of Bot[id].API.channel.list(guild.id)) for (const channel of i.data.items)
         array.push({
           ...guild,
@@ -112,6 +112,9 @@ const adapter = new class KOOKAdapter {
           group_id: `ko_${channel.id}`,
           group_name: `${guild.name}-${channel.name}`,
         })
+    } catch (err) {
+      logger.error(`获取频道列表错误：${logger.red(err)}`)
+    }
     return array
   }
 
@@ -249,7 +252,7 @@ const adapter = new class KOOKAdapter {
         logger.info(`${logger.blue(`[${data.self_id}]`)} 广播消息：${data.raw_message}`)
         break
       default:
-        logger.info(`${logger.blue(`[${data.self_id}]`)} 未知消息：${logger.red(JSON.stringify(data))}`)
+        logger.info(`${logger.blue(`[${data.self_id}]`)} 未知消息：${logger.magenta(JSON.stringify(data))}`)
     }
 
     data.reply = undefined
