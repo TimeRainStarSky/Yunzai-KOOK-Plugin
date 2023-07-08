@@ -15,8 +15,7 @@ const adapter = new class KOOKAdapter {
       return (await data.bot.API.asset.create(Buffer.from(file.replace(/^base64:\/\//, ""), "base64"))).data.url
     else if (file.match(/^https?:\/\//))
       return (await data.bot.API.asset.create(Buffer.from(await (await fetch(file)).arrayBuffer()))).data.url
-    else
-      return file
+    return file
   }
 
   async sendMsg(data, send, msg) {
@@ -56,7 +55,7 @@ const adapter = new class KOOKAdapter {
           at = i.data.qq.replace(/^ko_/, "")
           break
         case "node":
-          for (const ret of (await this.sendForwardMsg(msg => this.sendMsg(data, send, msg), i.data))) {
+          for (const ret of (await Bot.sendForwardMsg(msg => this.sendMsg(data, send, msg), i.data))) {
             msgs.push(...ret.data)
             message_id.push(...ret.message_id)
           }
@@ -95,11 +94,32 @@ const adapter = new class KOOKAdapter {
     return msgs
   }
 
-  async sendForwardMsg(send, msg) {
-    const messages = []
-    for (const i of msg)
-      messages.push(await send(i.message))
-    return messages
+  async getFriendInfo(id, user_id) {
+    const i = (await Bot[id].API.user.view(user_id)).data
+    return {
+      ...i,
+      user_id: `ko_${i.id}`,
+    }
+  }
+
+  async getMemberInfo(id, group_id, user_id) {
+    const i = (await Bot[id].API.user.view(user_id,
+      (await this.getGroupInfo(id, group_id)).guild.id)).data
+    return {
+      ...i,
+      user_id: `ko_${i.id}`,
+    }
+  }
+
+  async getGroupInfo(id, group_id) {
+    const channel = (await Bot[id].API.channel.view(group_id)).data
+    const guild = (await Bot[id].API.guild.view(channel.guild_id)).data
+    return {
+      guild,
+      channel,
+      group_id: `ko_${channel.id}`,
+      group_name: `${guild.name}-${channel.name}`,
+    }
   }
 
   async getGroupArray(id) {
@@ -107,8 +127,8 @@ const adapter = new class KOOKAdapter {
     for await (const i of Bot[id].API.guild.list()) for (const guild of i.data.items) try {
       for await (const i of Bot[id].API.channel.list(guild.id)) for (const channel of i.data.items)
         array.push({
-          ...guild,
-          ...channel,
+          guild,
+          channel,
           group_id: `ko_${channel.id}`,
           group_name: `${guild.name}-${channel.name}`,
         })
@@ -120,8 +140,8 @@ const adapter = new class KOOKAdapter {
 
   async getGroupList(id) {
     const array = []
-    for (const i of (await this.getGroupArray(id)))
-      array.push(i.group_id)
+    for (const { group_id } of (await this.getGroupArray(id)))
+      array.push(group_id)
     return array
   }
 
@@ -144,7 +164,8 @@ const adapter = new class KOOKAdapter {
       sendMsg: msg => this.sendFriendMsg(i, msg),
       recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.directMessage.delete(message_id), message_id),
       makeForwardMsg: Bot.makeForwardMsg,
-      sendForwardMsg: msg => this.sendForwardMsg(msg => this.sendFriendMsg(i, msg), msg),
+      sendForwardMsg: msg => Bot.sendForwardMsg(msg => this.sendFriendMsg(i, msg), msg),
+      getInfo: () => this.getFriendInfo(id, i.user_id),
     }
   }
 
@@ -159,6 +180,7 @@ const adapter = new class KOOKAdapter {
     return {
       ...this.pickFriend(id, user_id),
       ...i,
+      getInfo: () => this.getMemberInfo(id, i.group_id, i.user_id),
     }
   }
 
@@ -174,8 +196,9 @@ const adapter = new class KOOKAdapter {
       sendMsg: msg => this.sendGroupMsg(i, msg),
       recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.message.delete(message_id), message_id),
       makeForwardMsg: Bot.makeForwardMsg,
-      sendForwardMsg: msg => this.sendForwardMsg(msg => this.sendGroupMsg(i, msg), msg),
-      pickMember: user_id => this.pickMember(id, i.group_id, user_id),
+      sendForwardMsg: msg => Bot.sendForwardMsg(msg => this.sendGroupMsg(i, msg), msg),
+      getInfo: () => this.getGroupInfo(id, i.group_id),
+      pickMember: user_id => this.pickMember(id, group_id, user_id),
     }
   }
 
@@ -191,12 +214,12 @@ const adapter = new class KOOKAdapter {
 
     if (data.isMentionAll) {
       data.message.push({ type: "at", qq: "all" })
-      data.raw_message += `[提及全体成员]`
+      data.raw_message += "[提及全体成员]"
     }
 
     if (data.isMentionHere) {
       data.message.push({ type: "at", qq: "online" })
-      data.raw_message += `[提及在线成员]`
+      data.raw_message += "[提及在线成员]"
     }
 
     if (Array.isArray(data.mention))
@@ -264,7 +287,6 @@ const adapter = new class KOOKAdapter {
   async connect(token) {
     const bot = new Kasumi({
       type: "websocket",
-      vendor: "hexona",
       token
     })
     bot.connect()
@@ -277,6 +299,7 @@ const adapter = new class KOOKAdapter {
 
     const id = `ko_${bot.me.userId}`
     Bot[id] = bot
+    Bot[id].adapter = this
     Bot[id].info = Bot[id].me
     Bot[id].uin = id
     Bot[id].nickname = Bot[id].info.username
@@ -335,22 +358,22 @@ export class KOOK extends plugin {
         {
           reg: "^#[Kk][Oo]+[Kk]?账号$",
           fnc: "List",
-          permission: "master"
+          permission: config.permission,
         },
         {
-          reg: "^#[Kk][Oo]+[Kk]?设置.*$",
+          reg: "^#[Kk][Oo]+[Kk]?设置.+$",
           fnc: "Token",
-          permission: "master"
+          permission: config.permission,
         }
       ]
     })
   }
 
-  async List () {
+  async List() {
     await this.reply(`共${config.token.length}个账号：\n${config.token.join("\n")}`, true)
   }
 
-  async Token () {
+  async Token() {
     const token = this.e.msg.replace(/^#[Kk][Oo]+[Kk]?设置/, "").trim()
     if (config.token.includes(token)) {
       config.token = config.token.filter(item => item != token)
