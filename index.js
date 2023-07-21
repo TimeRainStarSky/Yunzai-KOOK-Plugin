@@ -1,4 +1,4 @@
-logger.info(logger.yellow("- 正在加载 KOOK 插件"))
+logger.info(logger.yellow("- 正在加载 KOOK 适配器插件"))
 
 import { config, configSave } from "./Model/config.js"
 import fetch from "node-fetch"
@@ -351,8 +351,8 @@ Bot.adapter.push(adapter)
 export class KOOK extends plugin {
   constructor() {
     super({
-      name: "KOOK账号设置",
-      dsc: "KOOK账号设置",
+      name: "KOOKAdapter",
+      dsc: "KOOK 适配器设置",
       event: "message",
       rule: [
         {
@@ -391,4 +391,4 @@ export class KOOK extends plugin {
   }
 }
 
-logger.info(logger.green("- KOOK 插件 加载完成"))
+logger.info(logger.green("- KOOK 适配器插件 加载完成"))
