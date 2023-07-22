@@ -285,10 +285,7 @@ const adapter = new class KOOKAdapter {
   }
 
   async connect(token) {
-    const bot = new Kasumi({
-      type: "websocket",
-      token
-    })
+    const bot = new Kasumi({ type: "websocket", token })
     bot.connect()
     await new Promise(resolve => bot.once("connect.*", resolve))
 

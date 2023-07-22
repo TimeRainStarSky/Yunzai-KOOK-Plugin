@@ -16,14 +16,12 @@ TRSS-Yunzai KOOK Bot 适配器 插件
 ## 安装教程
 
 1. 准备：[TRSS-Yunzai](../../../Yunzai)
-
-2. 自动安装：`#安装KOOK-Plugin`
-- 手动安装：[GitHub](https://github.com/TimeRainStarSky/Yunzai-KOOK-Plugin) 或 [Gitee](https://gitee.com/TimeRainStarSky/Yunzai-KOOK-Plugin)
-
-```
-git clone --depth 1 https://gitee.com/TimeRainStarSky/Yunzai-KOOK-Plugin plugins/KOOK-Plugin
-pnpm i
-```
+2. 输入：`#安装KOOK-Plugin`
+3. 打开：[KOOK 开发者中心](https://developer.kookapp.cn/app) 创建 Bot：  
+① 新建应用  
+② 机器人 → 机器人连接模式 选择 `WebSocket` → 得到 `Token`  
+③ 机器人 → 邀请链接 → 打开链接 → 邀请 Bot 进入服务器  
+4. 输入：`#KO设置Token`
 
 ## 使用教程
 
