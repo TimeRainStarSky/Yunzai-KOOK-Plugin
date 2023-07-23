@@ -94,26 +94,26 @@ const adapter = new class KOOKAdapter {
     return msgs
   }
 
-  async getFriendInfo(id, user_id) {
-    const i = (await Bot[id].API.user.view(user_id)).data
+  async getFriendInfo(data) {
+    const i = (await data.bot.API.user.view(data.user_id)).data
     return {
       ...i,
       user_id: `ko_${i.id}`,
     }
   }
 
-  async getMemberInfo(id, group_id, user_id) {
-    const i = (await Bot[id].API.user.view(user_id,
-      (await this.getGroupInfo(id, group_id)).guild.id)).data
+  async getMemberInfo(data) {
+    const i = (await data.bot.API.user.view(data.user_id,
+      (await this.getGroupInfo(data)).guild.id)).data
     return {
       ...i,
       user_id: `ko_${i.id}`,
     }
   }
 
-  async getGroupInfo(id, group_id) {
-    const channel = (await Bot[id].API.channel.view(group_id)).data
-    const guild = (await Bot[id].API.guild.view(channel.guild_id)).data
+  async getGroupInfo(data) {
+    const channel = (await data.bot.API.channel.view(data.group_id)).data
+    const guild = (await data.bot.API.guild.view(channel.guild_id)).data
     return {
       guild,
       channel,
@@ -165,7 +165,8 @@ const adapter = new class KOOKAdapter {
       recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.directMessage.delete(message_id), message_id),
       makeForwardMsg: Bot.makeForwardMsg,
       sendForwardMsg: msg => Bot.sendForwardMsg(msg => this.sendFriendMsg(i, msg), msg),
-      getInfo: () => this.getFriendInfo(id, i.user_id),
+      getInfo: () => this.getFriendInfo(i),
+      getAvatarUrl: async () => (await this.getFriendInfo(i)).avatar,
     }
   }
 
@@ -180,7 +181,8 @@ const adapter = new class KOOKAdapter {
     return {
       ...this.pickFriend(id, user_id),
       ...i,
-      getInfo: () => this.getMemberInfo(id, i.group_id, i.user_id),
+      getInfo: () => this.getMemberInfo(i),
+      getAvatarUrl: async () => (await this.getMemberInfo(i)).avatar,
     }
   }
 
@@ -197,7 +199,8 @@ const adapter = new class KOOKAdapter {
       recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.message.delete(message_id), message_id),
       makeForwardMsg: Bot.makeForwardMsg,
       sendForwardMsg: msg => Bot.sendForwardMsg(msg => this.sendGroupMsg(i, msg), msg),
-      getInfo: () => this.getGroupInfo(id, i.group_id),
+      getInfo: () => this.getGroupInfo(i),
+      getAvatarUrl: async () => (await this.getGroupInfo(i)).guild.icon,
       pickMember: user_id => this.pickMember(id, group_id, user_id),
     }
   }
