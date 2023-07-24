@@ -27,32 +27,31 @@ const adapter = new class KOOKAdapter {
     let at
     for (let i of msg) {
       if (typeof i != "object")
-        i = { type: "text", data: { text: i }}
-      else if (!i.data)
-        i = { type: i.type, data: { ...i, type: undefined }}
+        i = { type: "text", text: i }
+
       let ret
       switch (i.type) {
         case "text":
-          logger.info(`${logger.blue(`[${data.self_id}]`)} 发送文本：${i.data.text}`)
-          ret = await send(1, i.data.text, quote, at)
+          logger.info(`${logger.blue(`[${data.self_id}]`)} 发送文本：${i.text}`)
+          ret = await send(1, i.text, quote, at)
           break
         case "image":
-          logger.info(`${logger.blue(`[${data.self_id}]`)} 发送图片：${i.data.file.replace(/^base64:\/\/.*/, "base64://...")}`)
-          ret = await send(2, await this.uploadFile(data, i.data.file), quote, at)
+          logger.info(`${logger.blue(`[${data.self_id}]`)} 发送图片：${i.file.replace(/^base64:\/\/.*/, "base64://...")}`)
+          ret = await send(2, await this.uploadFile(data, i.file), quote, at)
           break
         case "record":
-          logger.info(`${logger.blue(`[${data.self_id}]`)} 发送音频：${i.data.file.replace(/^base64:\/\/.*/, "base64://...")}`)
-          ret = await send(8, await this.uploadFile(data, i.data.file), quote, at)
+          logger.info(`${logger.blue(`[${data.self_id}]`)} 发送音频：${i.file.replace(/^base64:\/\/.*/, "base64://...")}`)
+          ret = await send(8, await this.uploadFile(data, i.file), quote, at)
           break
         case "video":
-          logger.info(`${logger.blue(`[${data.self_id}]`)} 发送视频：${i.data.file.replace(/^base64:\/\/.*/, "base64://...")}`)
-          ret = await send(3, await this.uploadFile(data, i.data.file), quote, at)
+          logger.info(`${logger.blue(`[${data.self_id}]`)} 发送视频：${i.file.replace(/^base64:\/\/.*/, "base64://...")}`)
+          ret = await send(3, await this.uploadFile(data, i.file), quote, at)
           break
         case "reply":
-          quote = i.data.id
+          quote = i.id
           break
         case "at":
-          at = i.data.qq.replace(/^ko_/, "")
+          at = i.qq.replace(/^ko_/, "")
           break
         case "node":
           for (const ret of (await Bot.sendForwardMsg(msg => this.sendMsg(data, send, msg), i.data))) {
