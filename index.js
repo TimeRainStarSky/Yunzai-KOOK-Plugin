@@ -145,10 +145,9 @@ const adapter = new class KOOKAdapter {
   }
 
   async getGroupMap(id) {
-    const map = new Map()
     for (const i of (await this.getGroupArray(id)))
-      map.set(i.group_id, i)
-    return map
+      Bot[id].gl.set(i.group_id, i)
+    return Bot[id].gl
   }
 
   pickFriend(id, user_id) {
@@ -321,7 +320,8 @@ const adapter = new class KOOKAdapter {
     Bot[id].getGroupMap = () => this.getGroupMap(id)
 
     Bot[id].fl = new Map()
-    Bot[id].gl = await Bot[id].getGroupMap()
+    Bot[id].gl = new Map()
+    Bot[id].getGroupMap()
 
     if (!Bot.uin.includes(id))
       Bot.uin.push(id)
