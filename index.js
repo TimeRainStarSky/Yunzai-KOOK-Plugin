@@ -8,6 +8,7 @@ const adapter = new class KOOKAdapter {
   constructor() {
     this.id = "KOOK"
     this.name = "KOOKBot"
+    this.version = `kasumi.js-${config.package.dependencies["kasumi.js"].replace("^", "v")}`
   }
 
   async uploadFile(data, file) {
@@ -291,7 +292,7 @@ const adapter = new class KOOKAdapter {
     await new Promise(resolve => bot.once("connect.*", resolve))
 
     if (!bot.me?.userId) {
-      logger.error(`${logger.blue(`[${token}]`)} ${this.name}(${this.id}) 连接失败`)
+      logger.error(`${logger.blue(`[${token}]`)} ${this.name}(${this.id}) ${this.version} 连接失败`)
       return false
     }
 
@@ -305,7 +306,7 @@ const adapter = new class KOOKAdapter {
     Bot[id].version = {
       id: this.id,
       name: this.name,
-      version: config.package.dependencies["kasumi.js"],
+      version: this.version,
     }
     Bot[id].stat = { start_time: Date.now()/1000 }
 
@@ -332,7 +333,7 @@ const adapter = new class KOOKAdapter {
       this.makeMessage(data)
     })
 
-    logger.mark(`${logger.blue(`[${id}]`)} ${this.name}(${this.id}) 已连接`)
+    logger.mark(`${logger.blue(`[${id}]`)} ${this.name}(${this.id}) ${this.version} 已连接`)
     Bot.emit(`connect.${id}`, Bot[id])
     Bot.emit("connect", Bot[id])
     return true
