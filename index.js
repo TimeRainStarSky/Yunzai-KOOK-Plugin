@@ -67,7 +67,7 @@ const adapter = new class KOOKAdapter {
       }
       if (ret) {
         msgs.push(ret)
-        if (ret?.data?.msg_id)
+        if (ret.data?.msg_id)
           message_id.push(ret.data.msg_id)
       }
     }
@@ -162,8 +162,6 @@ const adapter = new class KOOKAdapter {
       ...i,
       sendMsg: msg => this.sendFriendMsg(i, msg),
       recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.directMessage.delete(message_id), message_id),
-      makeForwardMsg: Bot.makeForwardMsg,
-      sendForwardMsg: msg => Bot.sendForwardMsg(msg => this.sendFriendMsg(i, msg), msg),
       getInfo: () => this.getFriendInfo(i),
       getAvatarUrl: async () => (await this.getFriendInfo(i)).avatar,
     }
@@ -196,8 +194,6 @@ const adapter = new class KOOKAdapter {
       ...i,
       sendMsg: msg => this.sendGroupMsg(i, msg),
       recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.message.delete(message_id), message_id),
-      makeForwardMsg: Bot.makeForwardMsg,
-      sendForwardMsg: msg => Bot.sendForwardMsg(msg => this.sendGroupMsg(i, msg), msg),
       getInfo: () => this.getGroupInfo(i),
       getAvatarUrl: async () => (await this.getGroupInfo(i)).guild.icon,
       pickMember: user_id => this.pickMember(id, group_id, user_id),
@@ -261,17 +257,12 @@ const adapter = new class KOOKAdapter {
       case "PERSON":
         data.message_type = "private"
         logger.info(`${logger.blue(`[${data.self_id}]`)} 好友消息：[${data.sender.nickname}(${data.user_id})] ${data.raw_message}`)
-        data.friend = data.bot.pickFriend(data.user_id)
         break
       case "GROUP":
         data.message_type = "group"
         data.group_id = `ko_${data.channelId}`
         data.group_name = data.rawEvent?.extra?.channel_name
-
         logger.info(`${logger.blue(`[${data.self_id}]`)} 群消息：[${data.group_name}(${data.group_id}), ${data.sender.nickname}(${data.user_id})] ${data.raw_message}`)
-        data.friend = data.bot.pickFriend(data.user_id)
-        data.group = data.bot.pickGroup(data.group_id)
-        data.member = data.group.pickMember(data.user_id)
         break
       case "BROADCAST":
         logger.info(`${logger.blue(`[${data.self_id}]`)} 广播消息：${data.raw_message}`)
