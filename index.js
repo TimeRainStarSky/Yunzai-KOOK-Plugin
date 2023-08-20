@@ -201,6 +201,7 @@ const adapter = new class KOOKAdapter {
   }
 
   makeMessage(data) {
+    data.bot = Bot[data.self_id]
     data.post_type = "message"
     data.user_id = `ko_${data.authorId}`
     data.sender = data.author
