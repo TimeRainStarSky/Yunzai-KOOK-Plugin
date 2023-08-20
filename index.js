@@ -272,9 +272,7 @@ const adapter = new class KOOKAdapter {
     }
 
     data.reply = undefined
-
-    Bot.emit(`${data.post_type}.${data.message_type}`, data)
-    Bot.emit(`${data.post_type}`, data)
+    Bot.em(`${data.post_type}.${data.message_type}`, data)
   }
 
   async connect(token) {
@@ -311,29 +309,24 @@ const adapter = new class KOOKAdapter {
     Bot[id].getGroupList = () => this.getGroupList(id)
     Bot[id].getGroupMap = () => this.getGroupMap(id)
 
-    Bot[id].fl = new Map()
-    Bot[id].gl = new Map()
+    Bot[id].fl = new Map
+    Bot[id].gl = new Map
+    Bot[id].gml = new Map
     Bot[id].getGroupMap()
-
-    if (!Bot.uin.includes(id))
-      Bot.uin.push(id)
 
     Bot[id].on("message.*", data => {
       data.self_id = id
-      data.bot = Bot[id]
       this.makeMessage(data)
     })
 
     logger.mark(`${logger.blue(`[${id}]`)} ${this.name}(${this.id}) ${this.version} 已连接`)
-    Bot.emit(`connect.${id}`, Bot[id])
-    Bot.emit("connect", Bot[id])
+    Bot.em(`connect.${id}`, { self_id: id })
     return true
   }
 
   async load() {
     for (const token of config.token)
       await adapter.connect(token)
-    return true
   }
 }
 
