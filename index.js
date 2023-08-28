@@ -8,7 +8,7 @@ const adapter = new class KOOKAdapter {
   constructor() {
     this.id = "KOOK"
     this.name = "KOOKBot"
-    this.version = `kasumi.js-${config.package.dependencies["kasumi.js"].replace("^", "v")}`
+    this.version = `kasumi.js ${config.package.dependencies["kasumi.js"].replace("^", "v")}`
   }
 
   async uploadFile(data, file) {
@@ -327,7 +327,10 @@ const adapter = new class KOOKAdapter {
 
   async load() {
     for (const token of config.token)
-      await adapter.connect(token)
+      await new Promise(resolve => {
+        adapter.connect(token).then(resolve)
+        setTimeout(resolve, 5000)
+      })
   }
 }
 
