@@ -278,8 +278,11 @@ const adapter = new class KOOKAdapter {
 
   async connect(token) {
     const bot = new Kasumi({ type: "websocket", token })
-    bot.connect()
-    await new Promise(resolve => bot.once("connect.*", resolve))
+    bot.login = bot.connect
+    await new Promise(resolve => {
+      bot.once("connect.*", resolve)
+      bot.login()
+    })
 
     if (!bot.me?.userId) {
       logger.error(`${logger.blue(`[${token}]`)} ${this.name}(${this.id}) ${this.version} 连接失败`)
@@ -357,21 +360,21 @@ export class KOOK extends plugin {
     })
   }
 
-  async List() {
-    await this.reply(`共${config.token.length}个账号：\n${config.token.join("\n")}`, true)
+  List() {
+    this.reply(`共${config.token.length}个账号：\n${config.token.join("\n")}`, true)
   }
 
   async Token() {
     const token = this.e.msg.replace(/^#[Kk][Oo]+[Kk]?设置/, "").trim()
     if (config.token.includes(token)) {
       config.token = config.token.filter(item => item != token)
-      await this.reply(`账号已删除，重启后生效，共${config.token.length}个账号`, true)
+      this.reply(`账号已删除，重启后生效，共${config.token.length}个账号`, true)
     } else {
       if (await adapter.connect(token)) {
         config.token.push(token)
-        await this.reply(`账号已连接，共${config.token.length}个账号`, true)
+        this.reply(`账号已连接，共${config.token.length}个账号`, true)
       } else {
-        await this.reply(`账号连接失败`, true)
+        this.reply(`账号连接失败`, true)
         return false
       }
     }
