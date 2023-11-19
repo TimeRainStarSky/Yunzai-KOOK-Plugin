@@ -2,7 +2,7 @@ logger.info(logger.yellow("- 正在加载 KOOK 适配器插件"))
 
 import { config, configSave } from "./Model/config.js"
 import fetch from "node-fetch"
-import { Kasumi } from "kasumi.js"
+import Kasumi from "kasumi.js"
 
 const adapter = new class KOOKAdapter {
   constructor() {
@@ -12,11 +12,7 @@ const adapter = new class KOOKAdapter {
   }
 
   async uploadFile(data, file) {
-    if (file.match(/^base64:\/\//))
-      return (await data.bot.API.asset.create(Buffer.from(file.replace(/^base64:\/\//, ""), "base64"))).data.url
-    else if (file.match(/^https?:\/\//))
-      return (await data.bot.API.asset.create(Buffer.from(await (await fetch(file)).arrayBuffer()))).data.url
-    return file
+    return (await data.bot.API.asset.create(await Bot.Buffer(file))).data.url
   }
 
   async sendMsg(data, send, msg) {
@@ -33,19 +29,19 @@ const adapter = new class KOOKAdapter {
       let ret
       switch (i.type) {
         case "text":
-          logger.info(`${logger.blue(`[${data.self_id}]`)} 发送文本：${i.text}`)
+          Bot.makeLog("info", `发送文本：${i.text}`, data.self_id)
           ret = await send(1, i.text, quote, at)
           break
         case "image":
-          logger.info(`${logger.blue(`[${data.self_id}]`)} 发送图片：${i.file.replace(/^base64:\/\/.*/, "base64://...")}`)
+          Bot.makeLog("info", `发送图片：${i.file}`, data.self_id)
           ret = await send(2, await this.uploadFile(data, i.file), quote, at)
           break
         case "record":
-          logger.info(`${logger.blue(`[${data.self_id}]`)} 发送音频：${i.file.replace(/^base64:\/\/.*/, "base64://...")}`)
+          Bot.makeLog("info", `发送音频：${i.file}`, data.self_id)
           ret = await send(8, await this.uploadFile(data, i.file), quote, at)
           break
         case "video":
-          logger.info(`${logger.blue(`[${data.self_id}]`)} 发送视频：${i.file.replace(/^base64:\/\/.*/, "base64://...")}`)
+          Bot.makeLog("info", `发送视频：${i.file}`, data.self_id)
           ret = await send(3, await this.uploadFile(data, i.file), quote, at)
           break
         case "reply":
@@ -62,7 +58,7 @@ const adapter = new class KOOKAdapter {
           break
         default:
           i = JSON.stringify(i)
-          logger.info(`${logger.blue(`[${data.self_id}]`)} 发送消息：${i}`)
+          Bot.makeLog("info", `发送消息：${i}`, data.self_id)
           ret = await send(1, i, quote, at)
       }
       if (ret) {
@@ -75,17 +71,17 @@ const adapter = new class KOOKAdapter {
   }
 
   sendFriendMsg(data, msg) {
-    logger.info(`${logger.blue(`[${data.self_id}]`)} 发送好友消息：[${data.user_id}]`)
+    Bot.makeLog("info", `发送好友消息：[${data.user_id}]`, data.self_id)
     return this.sendMsg(data, (type, content, quote) => data.bot.API.directMessage.create(type, data.user_id, content, quote), msg)
   }
 
   sendGroupMsg(data, msg) {
-    logger.info(`${logger.blue(`[${data.self_id}]`)} 发送群消息：[${data.group_id}]`)
+    Bot.makeLog("info", `发送群消息：[${data.group_id}]`, data.self_id)
     return this.sendMsg(data, (type, content, quote, at) => data.bot.API.message.create(type, data.group_id, content, quote, at), msg)
   }
 
   async recallMsg(data, recall, message_id) {
-    logger.info(`${logger.blue(`[${data.self_id}]`)} 撤回消息：${message_id}`)
+    Bot.makeLog("info", `撤回消息：${message_id}`, data.self_id)
     if (!Array.isArray(message_id))
       message_id = [message_id]
     const msgs = []
@@ -257,19 +253,19 @@ const adapter = new class KOOKAdapter {
     switch (data.channelType) {
       case "PERSON":
         data.message_type = "private"
-        logger.info(`${logger.blue(`[${data.self_id}]`)} 好友消息：[${data.sender.nickname}(${data.user_id})] ${data.raw_message}`)
+        Bot.makeLog("info", `好友消息：[${data.sender.nickname}(${data.user_id})] ${data.raw_message}`, data.self_id)
         break
       case "GROUP":
         data.message_type = "group"
         data.group_id = `ko_${data.channelId}`
         data.group_name = data.rawEvent?.extra?.channel_name
-        logger.info(`${logger.blue(`[${data.self_id}]`)} 群消息：[${data.group_name}(${data.group_id}), ${data.sender.nickname}(${data.user_id})] ${data.raw_message}`)
+        Bot.makeLog("info", `群消息：[${data.group_name}(${data.group_id}), ${data.sender.nickname}(${data.user_id})] ${data.raw_message}`, data.self_id)
         break
       case "BROADCAST":
-        logger.info(`${logger.blue(`[${data.self_id}]`)} 广播消息：${data.raw_message}`)
+        Bot.makeLog("info", `广播消息：${data.raw_message}`, data.self_id)
         break
       default:
-        logger.info(`${logger.blue(`[${data.self_id}]`)} 未知消息：${logger.magenta(JSON.stringify(data))}`)
+        Bot.makeLog("info", `未知消息：${logger.magenta(JSON.stringify(data))}`, data.self_id)
     }
 
     data.reply = undefined
