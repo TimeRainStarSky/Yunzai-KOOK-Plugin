@@ -1,17 +1,14 @@
-import fs from "fs"
+import fs from "node:fs"
 import YAML from "yaml"
 import _ from "lodash"
 
 const configFile = "config/KOOK.yaml"
 const configSave = config => fs.writeFileSync(configFile, YAML.stringify({ ...config, package: undefined }), "utf-8")
 
-const configFileOld = "plugins/KOOK-Plugin/config.yaml"
-if (fs.existsSync(configFileOld))
-  fs.renameSync(configFileOld, configFile)
-
 const config = {
   tips: "",
   permission: "master",
+  sendCardMsg: true,
   token: []
 }
 

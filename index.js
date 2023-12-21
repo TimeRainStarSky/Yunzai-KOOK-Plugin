@@ -2,7 +2,7 @@ logger.info(logger.yellow("- 正在加载 KOOK 适配器插件"))
 
 import { config, configSave } from "./Model/config.js"
 import fetch from "node-fetch"
-import Kasumi from "kasumi.js"
+import { package as Kasumi } from "kasumi.js"
 
 const adapter = new class KOOKAdapter {
   constructor() {
@@ -12,72 +12,242 @@ const adapter = new class KOOKAdapter {
   }
 
   async uploadFile(data, file) {
-    return (await data.bot.API.asset.create(await Bot.Buffer(file))).data.url
+    return (await data.bot.sdk.API.asset.create(await Bot.Buffer(file))).data.url
   }
 
-  async sendMsg(data, send, msg) {
+  makeButton(button) {
+    const msg = {
+      type: "button",
+      text: button.text,
+      ...button.KOOKBot,
+    }
+
+    if (button.input) {
+      msg.click = "return-val"
+      msg.value = JSON.stringify({ input: button.input, send: button.send })
+    } else if (button.callback) {
+      msg.click = "return-val"
+      msg.value = JSON.stringify({ callback: button.callback })
+    } else if (button.link) {
+      msg.click = "link"
+      msg.value = button.link
+    } else return false
+
+    return msg
+  }
+
+  makeButtons(button_square) {
+    const modules = []
+    for (const button_row of button_square) {
+      let elements = []
+      for (let button of button_row) {
+        button = this.makeButton(button)
+        if (button) {
+          if (elements.length == 4) {
+            modules.push({ type: "action-group", elements })
+            elements = []
+          }
+          elements.push(button)
+        }
+      }
+      if (elements.length)
+        modules.push({ type: "action-group", elements })
+    }
+    return modules
+  }
+
+  async makeCardMsg(data, msg) {
     if (!Array.isArray(msg))
       msg = [msg]
     const msgs = []
-    const message_id = []
+    const modules = []
+    let msg_log = ""
     let quote
     let at
+
     for (let i of msg) {
       if (typeof i != "object")
         i = { type: "text", text: i }
+      let src
+      if (i.file)
+        src = await this.uploadFile(data, i.file)
 
-      let ret
+      let msg
       switch (i.type) {
         case "text":
-          Bot.makeLog("info", `发送文本：${i.text}`, data.self_id)
-          ret = await send(1, i.text, quote, at)
+          msg_log += `[文本：${i.text}]`
+          modules.push({ type: "section", text: i.text })
           break
         case "image":
-          Bot.makeLog("info", `发送图片：${i.file}`, data.self_id)
-          ret = await send(2, await this.uploadFile(data, i.file), quote, at)
+          msg_log += `[图片：${src}]`
+          modules.push({ type: "container", elements: [{ type: "image", src }] })
           break
         case "record":
-          Bot.makeLog("info", `发送音频：${i.file}`, data.self_id)
-          ret = await send(8, await this.uploadFile(data, i.file), quote, at)
+          msg_log += `[音频：${src}]`
+          modules.push({ type: "audio", src })
           break
         case "video":
-          Bot.makeLog("info", `发送视频：${i.file}`, data.self_id)
-          ret = await send(3, await this.uploadFile(data, i.file), quote, at)
+          msg_log += `[视频：${src}]`
+          modules.push({ type: "video", src })
           break
+        case "file":
+          msg_log += `[文件：${src}]`
+          modules.push({ type: "file", src })
         case "reply":
+          msg_log += `[回复：${i.id}]`
           quote = i.id
           break
         case "at":
+          msg_log += `[提及：${i.qq}]`
           at = i.qq.replace(/^ko_/, "")
           break
         case "node":
-          for (const ret of (await Bot.sendForwardMsg(msg => this.sendMsg(data, send, msg), i.data))) {
-            msgs.push(...ret.data)
-            message_id.push(...ret.message_id)
+          for (const { message } of i.data) {
+            const msg = await this.makeCardMsg(data, message)
+            msgs.push(...msg.msgs)
+            msg_log += msg.msg_log
           }
+          break
+        case "button":
+          msg_log += "[按钮]"
+          modules.push(...this.makeButtons(i.data))
+          break
+        case "markdown":
+          msg_log += `[Markdown：${i.data}]`
+          modules.push({ type: "section", text: { type: "kmarkdown", content: i.data } })
+          break
+        case "raw":
+          msg_log += `[原始消息：${JSON.stringify(i.data)}]`
+          msgs.push(i.data)
           break
         default:
           i = JSON.stringify(i)
-          Bot.makeLog("info", `发送消息：${i}`, data.self_id)
-          ret = await send(1, i, quote, at)
-      }
-      if (ret) {
-        msgs.push(ret)
-        if (ret.data?.msg_id)
-          message_id.push(ret.data.msg_id)
+          msg_log += `[文本：${i}]`
+          modules.push({ type: "section", text: i })
       }
     }
-    return { data: msgs, message_id }
+
+    if (modules.length) for (let i=0; i<modules.length; i+=50)
+      msgs.push([10, JSON.stringify([{
+        type: "card",
+        modules: modules.slice(i, i+50),
+      }]), quote, at])
+    return { msgs, msg_log }
+  }
+
+  async makeMsg(data, msg) {
+    if (!Array.isArray(msg))
+      msg = [msg]
+    const msgs = []
+    let msg_log = ""
+    let quote
+    let at
+
+    for (let i of msg) {
+      if (typeof i != "object")
+        i = { type: "text", text: i }
+      let file
+      if (i.file)
+        file = await this.uploadFile(data, i.file)
+
+      let msg
+      switch (i.type) {
+        case "text":
+          msg_log += `[文本：${i.text}]`
+          msg = [1, i.text]
+          break
+        case "image":
+          msg_log += `[图片：${file}]`
+          msg = [2, file]
+          break
+        case "record":
+          msg_log += `[音频：${file}]`
+          msg = [8, file]
+          break
+        case "video":
+          msg_log += `[视频：${file}]`
+          msg = [3, file]
+          break
+        case "file":
+          msg_log += `[文件：${file}]`
+          msg = [4, file]
+        case "reply":
+          msg_log += `[回复：${i.id}]`
+          quote = i.id
+          continue
+        case "at":
+          msg_log += `[提及：${i.qq}]`
+          at = i.qq.replace(/^ko_/, "")
+          continue
+        case "node":
+          for (const { message } of i.data) {
+            const msg = await this.makeMsg(data, message)
+            msgs.push(...msg.msgs)
+            msg_log += msg.msg_log
+          }
+          continue
+        case "button":
+          msg_log += "[按钮]"
+          msg = [10, JSON.stringify([{ type: "card", modules: this.makeButtons(i.data) }])]
+          break
+        case "markdown":
+          msg_log += `[Markdown：${i.data}]`
+          msg = [9, i.data]
+          break
+        case "raw":
+          msg_log += `[原始消息：${JSON.stringify(i.data)}]`
+          msg = i.data
+          break
+        default:
+          i = JSON.stringify(i)
+          msg_log += `[文本：${i}]`
+          msg = [1, i]
+      }
+
+      if (msg) {
+        if (quote) msg[2] = quote
+        if (at) msg[3] = at
+        msgs.push(msg)
+      }
+    }
+    return { msgs, msg_log }
+  }
+
+  async sendMsg(data, msg, send, log) {
+    let msgs
+    if (config.sendCardMsg)
+      msgs = await this.makeCardMsg(data, msg)
+    else
+      msgs = await this.makeMsg(data, msg)
+    const rets = { message_id: [], data: [] }
+    log(msgs.msg_log)
+    for (const i of msgs.msgs) try {
+      Bot.makeLog("debug", ["发送消息", i], data.self_id)
+      const ret = await send(...i)
+      Bot.makeLog("debug", ["发送消息返回", ret], data.self_id)
+      if (ret) {
+        rets.data.push(ret)
+        if (ret.data?.msg_id)
+          rets.message_id.push(ret.data.msg_id)
+      }
+    } catch (err) {
+      Bot.makeLog("error", [`发送消息错误：${Bot.String(msg)}\n`, err], data.self_id)
+    }
+    return rets
   }
 
   sendFriendMsg(data, msg) {
-    Bot.makeLog("info", `发送好友消息：[${data.user_id}]`, data.self_id)
-    return this.sendMsg(data, (type, content, quote) => data.bot.API.directMessage.create(type, data.user_id, content, quote), msg)
+    return this.sendMsg(data, msg,
+      (type, content, quote) => data.bot.sdk.API.directMessage.create(type, data.user_id, content, quote),
+      log => Bot.makeLog("info", [`发送好友消息：[${data.user_id}]`, log], data.self_id),
+    )
   }
 
   sendGroupMsg(data, msg) {
-    Bot.makeLog("info", `发送群消息：[${data.group_id}]`, data.self_id)
-    return this.sendMsg(data, (type, content, quote, at) => data.bot.API.message.create(type, data.group_id, content, quote, at), msg)
+    return this.sendMsg(data, msg,
+      (type, content, quote, at) => data.bot.sdk.API.message.create(type, data.group_id, content, quote, at),
+      log => Bot.makeLog("info", [`发送群消息：[${data.group_id}]`, log], data.self_id),
+    )
   }
 
   async recallMsg(data, recall, message_id) {
@@ -91,7 +261,7 @@ const adapter = new class KOOKAdapter {
   }
 
   async getFriendInfo(data) {
-    const i = (await data.bot.API.user.view(data.user_id)).data
+    const i = (await data.bot.sdk.API.user.view(data.user_id)).data
     return {
       ...i,
       user_id: `ko_${i.id}`,
@@ -99,7 +269,7 @@ const adapter = new class KOOKAdapter {
   }
 
   async getMemberInfo(data) {
-    const i = (await data.bot.API.user.view(data.user_id,
+    const i = (await data.bot.sdk.API.user.view(data.user_id,
       (await this.getGroupInfo(data)).guild.id)).data
     return {
       ...i,
@@ -108,8 +278,8 @@ const adapter = new class KOOKAdapter {
   }
 
   async getGroupInfo(data) {
-    const channel = (await data.bot.API.channel.view(data.group_id)).data
-    const guild = (await data.bot.API.guild.view(channel.guild_id)).data
+    const channel = (await data.bot.sdk.API.channel.view(data.group_id)).data
+    const guild = (await data.bot.sdk.API.guild.view(channel.guild_id)).data
     return {
       guild,
       channel,
@@ -120,8 +290,8 @@ const adapter = new class KOOKAdapter {
 
   async getGroupArray(id) {
     const array = []
-    for await (const i of Bot[id].API.guild.list()) for (const guild of i.data.items) try {
-      for await (const i of Bot[id].API.channel.list(guild.id)) for (const channel of i.data.items)
+    for await (const i of Bot[id].sdk.API.guild.list()) for (const guild of i.data.items) try {
+      for await (const i of Bot[id].sdk.API.channel.list(guild.id)) for (const channel of i.data.items)
         array.push({
           guild,
           channel,
@@ -157,7 +327,7 @@ const adapter = new class KOOKAdapter {
     return {
       ...i,
       sendMsg: msg => this.sendFriendMsg(i, msg),
-      recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.directMessage.delete(message_id), message_id),
+      recallMsg: message_id => this.recallMsg(i, message_id => i.bot.sdk.API.directMessage.delete(message_id), message_id),
       getInfo: () => this.getFriendInfo(i),
       getAvatarUrl: async () => (await this.getFriendInfo(i)).avatar,
     }
@@ -189,91 +359,158 @@ const adapter = new class KOOKAdapter {
     return {
       ...i,
       sendMsg: msg => this.sendGroupMsg(i, msg),
-      recallMsg: message_id => this.recallMsg(i, message_id => i.bot.API.message.delete(message_id), message_id),
+      recallMsg: message_id => this.recallMsg(i, message_id => i.bot.sdk.API.message.delete(message_id), message_id),
       getInfo: () => this.getGroupInfo(i),
       getAvatarUrl: async () => (await this.getGroupInfo(i)).guild.icon,
       pickMember: user_id => this.pickMember(id, group_id, user_id),
     }
   }
 
-  makeMessage(data) {
-    data.bot = Bot[data.self_id]
-    data.post_type = "message"
-    data.user_id = `ko_${data.authorId}`
-    data.sender = data.author
+  makeMessage(id, event) {
+    const data = {
+      bot: Bot[id],
+      self_id: id,
+      raw: event,
+
+      post_type: "message",
+      user_id: `ko_${event.authorId}`,
+      sender: event.author,
+      message_id: event.messageId,
+
+      message: [],
+      raw_message: "",
+    }
     data.bot.fl.set(data.user_id, data.sender)
-    data.message_id = data.messageId
 
-    data.message = []
-    data.raw_message = ""
-
-    if (data.isMentionAll) {
+    if (event.isMentionAll) {
       data.message.push({ type: "at", qq: "all" })
       data.raw_message += "[提及全体成员]"
     }
 
-    if (data.isMentionHere) {
+    if (event.isMentionHere) {
       data.message.push({ type: "at", qq: "online" })
       data.raw_message += "[提及在线成员]"
     }
 
-    if (Array.isArray(data.mention))
-      for (const i of data.mention) {
+    if (Array.isArray(event.mention))
+      for (const i of event.mention) {
         data.message.push({ type: "at", qq: `ko_${i}` })
         data.raw_message += `[提及：ko_${i}]`
       }
 
-    switch (data.messageType) {
+    switch (event.messageType) {
       case 2:
-        data.message.push({ type: "image", url: data.content })
-        data.raw_message += `[图片：${data.content}]`
+        data.message.push({ type: "image", url: event.content })
+        data.raw_message += `[图片：${event.content}]`
         break
       case 3:
-        data.message.push({ type: "video", url: data.content })
-        data.raw_message += `[视频：${data.content}]`
+        data.message.push({ type: "video", url: event.content })
+        data.raw_message += `[视频：${event.content}]`
         break
       case 4:
-        data.message.push({ type: "file", url: data.content })
-        data.raw_message += `[文件：${data.content}]`
+        data.message.push({ type: "file", url: event.content })
+        data.raw_message += `[文件：${event.content}]`
         break
       case 8:
-        data.message.push({ type: "record", url: data.content })
-        data.raw_message += `[音频：${data.content}]`
+        data.message.push({ type: "record", url: event.content })
+        data.raw_message += `[音频：${event.content}]`
         break
       case 9:
-        data.content = data.content.replace(/\\(.)/g, "$1")
-        data.message.push({ type: "text", text: data.content })
-        data.raw_message += data.content
+        data.content = event.content.replace(/\\(.)/g, "$1")
+        data.message.push({ type: "text", text: event.content })
+        data.raw_message += event.content
         break
       default:
-        data.message.push({ type: "text", text: data.content })
-        data.raw_message += data.content
+        data.message.push({ type: "text", text: event.content })
+        data.raw_message += event.content
     }
 
-    switch (data.channelType) {
+    switch (event.channelType) {
       case "PERSON":
         data.message_type = "private"
-        Bot.makeLog("info", `好友消息：[${data.sender.nickname}(${data.user_id})] ${data.raw_message}`, data.self_id)
+        Bot.makeLog("info", `好友消息：[${data.sender.nickname}(${data.user_id})] ${data.raw_message}`, id)
         break
       case "GROUP":
         data.message_type = "group"
-        data.group_id = `ko_${data.channelId}`
-        data.group_name = data.rawEvent?.extra?.channel_name
-        Bot.makeLog("info", `群消息：[${data.group_name}(${data.group_id}), ${data.sender.nickname}(${data.user_id})] ${data.raw_message}`, data.self_id)
+        data.group_id = `ko_${event.channelId}`
+        data.group_name = event.rawEvent?.extra?.channel_name
+        Bot.makeLog("info", `群消息：[${data.group_name}(${data.group_id}), ${data.sender.nickname}(${data.user_id})] ${data.raw_message}`, id)
         break
       case "BROADCAST":
-        Bot.makeLog("info", `广播消息：${data.raw_message}`, data.self_id)
+        Bot.makeLog("info", `广播消息：${data.raw_message}`, id)
         break
       default:
-        Bot.makeLog("info", `未知消息：${logger.magenta(JSON.stringify(data))}`, data.self_id)
+        Bot.makeLog("warn", ["未知消息", event], id)
     }
 
-    data.reply = undefined
     Bot.em(`${data.post_type}.${data.message_type}`, data)
   }
 
+  makeMessageBtnClick(id, event) {
+    const data = {
+      bot: Bot[id],
+      self_id: id,
+      raw: event,
+
+      post_type: "message",
+      user_id: `ko_${event.authorId}`,
+      sender: event.author,
+      message_id: event.messageId,
+
+      message: [{ type: "reply", id: event.targetMsgId }],
+      raw_message: `[回复：${event.targetMsgId}]`,
+    }
+    data.bot.fl.set(data.user_id, data.sender)
+
+    if (event.channelType == "GROUP") {
+      data.message_type = "group"
+      data.group_id = `ko_${event.channelId}`
+      data.group_name = event.rawEvent?.extra?.channel_name
+      Bot.makeLog("info", `群按钮点击事件：[${data.group_name}(${data.group_id}), ${data.sender.nickname}(${data.user_id})] ${data.raw_message} ${event.value}`, id)
+    } else {
+      data.message_type = "private"
+      Bot.makeLog("info", `好友按钮点击事件：[${data.sender.nickname}(${data.user_id})] ${data.raw_message} ${event.value}`, id)
+    }
+
+    try {
+      data.value = JSON.parse(event.value)
+    } catch (err) {
+      return Bot.makeLog("error", ["按钮点击事件解析错误", err], id)
+    }
+
+    if (data.value.input) {
+      if (data.value.send) {
+        data.message.push({ type: "text", text: data.value.input })
+        data.raw_message += data.value.input
+      } else {
+        const msg = [
+          segment.reply(event.targetMsgId),
+          segment.markdown(`请输入\`${data.value.input}\``),
+        ]
+        if (data.message_type == "group")
+          return data.bot.pickGroup(data.group_id).sendMsg(msg)
+        else
+          return data.bot.pickFriend(data.user_id).sendMsg(msg)
+      }
+    } else if (data.value.callback) {
+      data.message.push({ type: "text", text: data.value.callback })
+      data.raw_message += data.value.callback
+    }
+    Bot.em(`${data.post_type}.${data.message_type}`, data)
+  }
+
+  makeEvent(id, event) {
+    switch (event.rawEvent?.extra?.type) {
+      case "message_btn_click":
+        this.makeMessageBtnClick(id, event)
+        break
+      default:
+        Bot.makeLog("warn", ["未知消息", event], id)
+    }
+  }
+
   async connect(token) {
-    const bot = new Kasumi({ type: "websocket", token })
+    const bot = new Kasumi.default({ type: "websocket", token })
     bot.login = bot.connect
     await new Promise(resolve => {
       bot.once("connect.*", resolve)
@@ -286,38 +523,39 @@ const adapter = new class KOOKAdapter {
     }
 
     const id = `ko_${bot.me.userId}`
-    Bot[id] = bot
-    Bot[id].adapter = this
-    Bot[id].info = Bot[id].me
-    Bot[id].uin = id
-    Bot[id].nickname = Bot[id].info.username
-    Bot[id].avatar = Bot[id].info.avatar
-    Bot[id].version = {
-      id: this.id,
-      name: this.name,
-      version: this.version,
+    Bot[id] = {
+      adapter: this,
+      sdk: bot,
+
+      info: bot.me,
+      uin: id,
+      get nickname() { return this.info.username },
+      get avatar() { return this.info.avatar },
+      version: {
+        id: this.id,
+        name: this.name,
+        version: this.version,
+      },
+      stat: { start_time: Date.now()/1000 },
+
+      pickFriend: user_id => this.pickFriend(id, user_id),
+      get pickUser() { return this.pickFriend },
+
+      pickMember: (group_id, user_id) => this.pickMember(id, group_id, user_id),
+      pickGroup: group_id => this.pickGroup(id, group_id),
+
+      getGroupArray: () => this.getGroupArray(id),
+      getGroupList: () => this.getGroupList(id),
+      getGroupMap: () => this.getGroupMap(id),
+
+      fl: new Map,
+      gl: new Map,
+      gml: new Map,
     }
-    Bot[id].stat = { start_time: Date.now()/1000 }
 
-    Bot[id].pickFriend = user_id => this.pickFriend(id, user_id)
-    Bot[id].pickUser = Bot[id].pickFriend
-
-    Bot[id].pickMember = (group_id, user_id) => this.pickMember(id, group_id, user_id)
-    Bot[id].pickGroup = group_id => this.pickGroup(id, group_id)
-
-    Bot[id].getGroupArray = () => this.getGroupArray(id)
-    Bot[id].getGroupList = () => this.getGroupList(id)
-    Bot[id].getGroupMap = () => this.getGroupMap(id)
-
-    Bot[id].fl = new Map
-    Bot[id].gl = new Map
-    Bot[id].gml = new Map
     Bot[id].getGroupMap()
-
-    Bot[id].on("message.*", data => {
-      data.self_id = id
-      this.makeMessage(data)
-    })
+    Bot[id].sdk.on("message.*", data => this.makeMessage(id, data))
+    Bot[id].sdk.on("event.*", data => this.makeEvent(id, data))
 
     logger.mark(`${logger.blue(`[${id}]`)} ${this.name}(${this.id}) ${this.version} 已连接`)
     Bot.em(`connect.${id}`, { self_id: id })
