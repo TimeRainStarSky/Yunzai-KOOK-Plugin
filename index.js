@@ -104,8 +104,10 @@ const adapter = new class KOOKAdapter {
         case "node":
           for (const { message } of i.data) {
             const msg = await this.makeCardMsg(data, message)
-            msgs.push(...msg.msgs)
             msg_log += msg.msg_log
+            modules.push(...msg.modules)
+            if (msg.quote) quote = msg.quote
+            if (msg.at) at = msg.at
           }
           break
         case "button":
@@ -127,12 +129,7 @@ const adapter = new class KOOKAdapter {
       }
     }
 
-    if (modules.length) for (let i=0; i<modules.length; i+=50)
-      msgs.push([10, JSON.stringify([{
-        type: "card",
-        modules: modules.slice(i, i+50),
-      }]), quote, at])
-    return { msgs, msg_log }
+    return { msg_log, modules, quote, at }
   }
 
   async makeMsg(data, msg) {
@@ -214,24 +211,42 @@ const adapter = new class KOOKAdapter {
   }
 
   async sendMsg(data, msg, send, log) {
-    let msgs
-    if (config.sendCardMsg)
-      msgs = await this.makeCardMsg(data, msg)
-    else
-      msgs = await this.makeMsg(data, msg)
     const rets = { message_id: [], data: [] }
-    log(msgs.msg_log)
-    for (const i of msgs.msgs) try {
+    let msgs
+
+    const sendMsg = async () => { for (const i of msgs.msgs) try {
       Bot.makeLog("debug", ["发送消息", i], data.self_id)
       const ret = await send(...i)
       Bot.makeLog("debug", ["发送消息返回", ret], data.self_id)
-      if (ret) {
-        rets.data.push(ret)
-        if (ret.data?.msg_id)
-          rets.message_id.push(ret.data.msg_id)
+
+      if (ret.err) {
+        Bot.makeLog("error", [`发送消息错误：${Bot.String(i)}\n`, ret.err], data.self_id)
+        return false
       }
+
+      rets.data.push(ret)
+      if (ret.data?.msg_id)
+        rets.message_id.push(ret.data.msg_id)
     } catch (err) {
       Bot.makeLog("error", [`发送消息错误：${Bot.String(msg)}\n`, err], data.self_id)
+      return false
+    }}
+
+    if (config.sendCardMsg) {
+      const { msg_log, modules, quote, at } = await this.makeCardMsg(data, msg)
+      msgs = { msgs: [], msg_log }
+      if (modules.length) for (let i=0; i<modules.length; i+=50)
+        msgs.msgs.push([10, JSON.stringify([{
+          type: "card", modules: modules.slice(i, i+50),
+        }]), quote, at])
+    } else {
+      msgs = await this.makeMsg(data, msg)
+    }
+
+    log(msgs.msg_log)
+    if (await sendMsg() === false) {
+      msgs = await this.makeMsg(data, msg)
+      await sendMsg()
     }
     return rets
   }
