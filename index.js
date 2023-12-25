@@ -9,16 +9,18 @@ const adapter = new class KOOKAdapter {
     this.id = "KOOK"
     this.name = "KOOKBot"
     this.version = `kasumi.js ${config.package.dependencies["kasumi.js"].replace("^", "v")}`
+    this.card_theme = ["primary", "success", "danger", "warning", "info", "secondary", "none"]
   }
 
   async uploadFile(data, file) {
     return (await data.bot.sdk.API.asset.create(await Bot.Buffer(file))).data.url
   }
 
-  makeButton(button) {
+  makeButton(button, theme) {
     const msg = {
       type: "button",
       text: button.text,
+      theme,
       ...button.KOOKBot,
     }
 
@@ -38,16 +40,18 @@ const adapter = new class KOOKAdapter {
 
   makeButtons(button_square) {
     const modules = []
+    let random = Math.floor(Math.random()*6)
     for (const button_row of button_square) {
       let elements = []
       for (let button of button_row) {
-        button = this.makeButton(button)
+        button = this.makeButton(button, this.card_theme[random%6])
         if (button) {
           if (elements.length == 4) {
             modules.push({ type: "action-group", elements })
             elements = []
           }
           elements.push(button)
+          random++
         }
       }
       if (elements.length)
@@ -235,10 +239,15 @@ const adapter = new class KOOKAdapter {
     if (config.sendCardMsg) {
       const { msg_log, modules, quote, at } = await this.makeCardMsg(data, msg)
       msgs = { msgs: [], msg_log }
-      if (modules.length) for (let i=0; i<modules.length; i+=50)
-        msgs.msgs.push([10, JSON.stringify([{
-          type: "card", modules: modules.slice(i, i+50),
-        }]), quote, at])
+      if (modules.length) {
+        const random = Math.floor(Math.random()*7)
+        for (let i=0; i<modules.length; i+=50)
+          msgs.msgs.push([10, JSON.stringify([{
+            type: "card",
+            theme: this.card_theme[(random+i/50)%7],
+            modules: modules.slice(i, i+50),
+          }]), quote, at])
+      }
     } else {
       msgs = await this.makeMsg(data, msg)
     }
