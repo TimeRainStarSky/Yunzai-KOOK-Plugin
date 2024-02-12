@@ -1,14 +1,26 @@
 logger.info(logger.yellow("- 正在加载 KOOK 适配器插件"))
 
-import { config, configSave } from "./Model/config.js"
+import makeConfig from "../../lib/plugins/config.js"
 import fetch from "node-fetch"
-import { package as Kasumi } from "kasumi.js"
+import Kasumi from "kasumi.js"
+
+const { config, configSave } = await makeConfig("KOOK", {
+  tips: "",
+  permission: "master",
+  sendCardMsg: true,
+  token: [],
+}, {
+  tips: [
+    "欢迎使用 TRSS-Yunzai KOOK Plugin ! 作者：时雨🌌星空",
+    "参考：https://github.com/TimeRainStarSky/Yunzai-KOOK-Plugin",
+  ],
+})
 
 const adapter = new class KOOKAdapter {
   constructor() {
     this.id = "KOOK"
     this.name = "KOOKBot"
-    this.version = `kasumi.js ${config.package.dependencies["kasumi.js"].replace("^", "v")}`
+    this.version = `kasumi.js v0.5.14`
     this.card_theme = ["primary", "success", "danger", "warning", "info", "secondary", "none"]
   }
 
@@ -534,7 +546,7 @@ const adapter = new class KOOKAdapter {
   }
 
   async connect(token) {
-    const bot = new Kasumi.default({ type: "websocket", token })
+    const bot = new Kasumi({ type: "websocket", token })
     bot.login = bot.connect
     await new Promise(resolve => {
       bot.once("connect.*", resolve)
@@ -636,7 +648,7 @@ export class KOOK extends plugin {
         return false
       }
     }
-    configSave(config)
+    await configSave()
   }
 }
 

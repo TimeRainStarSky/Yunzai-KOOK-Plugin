@@ -3,6 +3,6 @@
   "type": "module",
   "author": "TimeRainStarSky",
   "dependencies": {
-    "kasumi.js": "0.5.13"
+    "kasumi.js": "0.5.14"
   }
 }
