@@ -227,7 +227,7 @@ const adapter = new class KOOKAdapter {
   }
 
   async sendMsg(data, msg, send, log) {
-    const rets = { message_id: [], data: [] }
+    const rets = { message_id: [], data: [], error: [] }
     let msgs
 
     const sendMsg = async () => { for (const i of msgs.msgs) try {
@@ -236,7 +236,8 @@ const adapter = new class KOOKAdapter {
       Bot.makeLog("debug", ["发送消息返回", ret], data.self_id)
 
       if (ret.err) {
-        Bot.makeLog("error", [`发送消息错误：${Bot.String(i)}\n`, ret.err], data.self_id)
+        Bot.makeLog("error", ["发送消息错误", i, ret.err], data.self_id)
+        rets.error.push(ret.err)
         return false
       }
 
@@ -244,7 +245,8 @@ const adapter = new class KOOKAdapter {
       if (ret.data?.msg_id)
         rets.message_id.push(ret.data.msg_id)
     } catch (err) {
-      Bot.makeLog("error", [`发送消息错误：${Bot.String(msg)}\n`, err], data.self_id)
+      Bot.makeLog("error", ["发送消息错误", msg, err], data.self_id)
+      rets.error.push(err)
       return false
     }}
 
@@ -451,12 +453,12 @@ const adapter = new class KOOKAdapter {
         data.message.push({ type: "record", url: event.content })
         data.raw_message += `[音频：${event.content}]`
         break
-      case 9:
-        data.content = event.content.replace(/\\(.)/g, "$1")
-        data.message.push({ type: "text", text: event.content })
-        data.raw_message += event.content
+      case 9: {
+        const text = event.content.replace(/\(met\).+?\(met\)/g, "").replace(/\\(.)/g, "$1")
+        data.message.push({ type: "text", text })
+        data.raw_message += text
         break
-      default:
+      } default:
         data.message.push({ type: "text", text: event.content })
         data.raw_message += event.content
     }
@@ -541,7 +543,7 @@ const adapter = new class KOOKAdapter {
         this.makeMessageBtnClick(id, event)
         break
       default:
-        Bot.makeLog("warn", ["未知消息", event], id)
+        //Bot.makeLog("warn", ["未知事件", event], id)
     }
   }
 
