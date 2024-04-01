@@ -72,7 +72,7 @@ const adapter = new class KOOKAdapter {
     return modules
   }
 
-  async makeCardMsg(data, msg) {
+  async makeCardMsg(data, msg, raw) {
     if (!Array.isArray(msg))
       msg = [msg]
     const msgs = []
@@ -119,7 +119,7 @@ const adapter = new class KOOKAdapter {
           break
         case "node":
           for (const { message } of i.data) {
-            const msg = await this.makeCardMsg(data, message)
+            const msg = await this.makeCardMsg(data, message, true)
             msg_log += msg.msg_log
             modules.push(...msg.modules)
             if (msg.quote) quote = msg.quote
@@ -145,7 +145,17 @@ const adapter = new class KOOKAdapter {
       }
     }
 
-    return { msg_log, modules, quote, at }
+    if (raw) return { msg_log, modules, quote, at }
+    if (modules.length) {
+      const random = Math.floor(Math.random()*7)
+      for (let i=0; i<modules.length; i+=50)
+        msgs.push([10, JSON.stringify([{
+          type: "card",
+          theme: this.card_theme[(random+i/50)%7],
+          modules: modules.slice(i, i+50),
+        }]), quote, at])
+    }
+    return { msgs, msg_log }
   }
 
   async makeMsg(data, msg) {
@@ -250,21 +260,10 @@ const adapter = new class KOOKAdapter {
       return false
     }}
 
-    if (config.sendCardMsg) {
-      const { msg_log, modules, quote, at } = await this.makeCardMsg(data, msg)
-      msgs = { msgs: [], msg_log }
-      if (modules.length) {
-        const random = Math.floor(Math.random()*7)
-        for (let i=0; i<modules.length; i+=50)
-          msgs.msgs.push([10, JSON.stringify([{
-            type: "card",
-            theme: this.card_theme[(random+i/50)%7],
-            modules: modules.slice(i, i+50),
-          }]), quote, at])
-      }
-    } else {
+    if (config.sendCardMsg)
+      msgs = await this.makeCardMsg(data, msg)
+    else
       msgs = await this.makeMsg(data, msg)
-    }
 
     log(msgs.msg_log)
     if (await sendMsg() === false) {
