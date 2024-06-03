@@ -58,7 +58,7 @@ const adapter = new class KOOKAdapter {
       for (let button of button_row) {
         button = this.makeButton(button, this.card_theme[random%6])
         if (button) {
-          if (elements.length == 4) {
+          if (elements.length === 4) {
             modules.push({ type: "action-group", elements })
             elements = []
           }
@@ -82,7 +82,7 @@ const adapter = new class KOOKAdapter {
     let at
 
     for (let i of msg) {
-      if (typeof i != "object")
+      if (typeof i !== "object")
         i = { type: "text", text: i }
       let src
       if (i.file)
@@ -167,7 +167,7 @@ const adapter = new class KOOKAdapter {
     let at
 
     for (let i of msg) {
-      if (typeof i != "object")
+      if (typeof i !== "object")
         i = { type: "text", text: i }
       let file
       if (i.file)
@@ -355,6 +355,8 @@ const adapter = new class KOOKAdapter {
   }
 
   pickFriend(id, user_id) {
+    if (typeof user_id !== "string")
+      user_id = String(user_id)
     const i = {
       ...Bot[id].fl.get(user_id),
       self_id: id,
@@ -371,6 +373,10 @@ const adapter = new class KOOKAdapter {
   }
 
   pickMember(id, group_id, user_id) {
+    if (typeof group_id !== "string")
+      group_id = String(group_id)
+    if (typeof user_id !== "string")
+      user_id = String(user_id)
     const i = {
       ...Bot[id].fl.get(user_id),
       self_id: id,
@@ -387,6 +393,8 @@ const adapter = new class KOOKAdapter {
   }
 
   pickGroup(id, group_id) {
+    if (typeof group_id !== "string")
+      group_id = String(group_id)
     const i = {
       ...Bot[id].gl.get(group_id),
       self_id: id,
@@ -499,7 +507,7 @@ const adapter = new class KOOKAdapter {
     }
     data.bot.fl.set(data.user_id, data.sender)
 
-    if (event.channelType == "GROUP") {
+    if (event.channelType === "GROUP") {
       data.message_type = "group"
       data.group_id = `ko_${event.channelId}`
       data.group_name = event.rawEvent?.extra?.channel_name
@@ -524,7 +532,7 @@ const adapter = new class KOOKAdapter {
           segment.reply(event.targetMsgId),
           segment.markdown(`请输入\`${data.value.input}\``),
         ]
-        if (data.message_type == "group")
+        if (data.message_type === "group")
           return data.bot.pickGroup(data.group_id).sendMsg(msg)
         else
           return data.bot.pickFriend(data.user_id).sendMsg(msg)
@@ -555,7 +563,7 @@ const adapter = new class KOOKAdapter {
     })
 
     if (!bot.me?.userId) {
-      logger.error(`${logger.blue(`[${token}]`)} ${this.name}(${this.id}) ${this.version} 连接失败`)
+      Bot.makeLog("error", `${this.name}(${this.id}) ${this.version} 连接失败`, token)
       return false
     }
 
@@ -594,17 +602,14 @@ const adapter = new class KOOKAdapter {
     Bot[id].sdk.on("message.*", data => this.makeMessage(id, data))
     Bot[id].sdk.on("event.*", data => this.makeEvent(id, data))
 
-    logger.mark(`${logger.blue(`[${id}]`)} ${this.name}(${this.id}) ${this.version} 已连接`)
+    Bot.makeLog("mark", `${this.name}(${this.id}) ${this.version} 已连接`, id)
     Bot.em(`connect.${id}`, { self_id: id })
     return true
   }
 
   async load() {
     for (const token of config.token)
-      await new Promise(resolve => {
-        adapter.connect(token).then(resolve)
-        setTimeout(resolve, 5000)
-      })
+      await Bot.sleep(5000, this.connect(token))
   }
 }
 
@@ -638,7 +643,7 @@ export class KOOK extends plugin {
   async Token() {
     const token = this.e.msg.replace(/^#[Kk][Oo]+[Kk]?设置/, "").trim()
     if (config.token.includes(token)) {
-      config.token = config.token.filter(item => item != token)
+      config.token = config.token.filter(item => item !== token)
       this.reply(`账号已删除，重启后生效，共${config.token.length}个账号`, true)
     } else {
       if (await adapter.connect(token)) {
