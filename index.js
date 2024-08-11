@@ -20,7 +20,7 @@ const adapter = new class KOOKAdapter {
   constructor() {
     this.id = "KOOK"
     this.name = "KOOKBot"
-    this.version = `kasumi.js v0.5.14`
+    this.version = `kasumi.js v0.6.7`
     this.card_theme = ["primary", "success", "danger", "warning", "info", "secondary", "none"]
   }
 
